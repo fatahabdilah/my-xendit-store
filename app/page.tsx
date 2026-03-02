@@ -172,7 +172,7 @@ export default function StorePage() {
                     {loading ? (
                       <>
                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Memproses...
+                        Memproses... 
                       </>
                     ) : (
                       "Checkout via Xendit"
