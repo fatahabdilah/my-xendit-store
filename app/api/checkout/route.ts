@@ -2,41 +2,65 @@ import { NextResponse } from 'next/server';
 import Xendit from 'xendit-node';
 
 export async function POST(request: Request) {
-  // DEBUG: Cek apakah key terbaca di terminal (Hanya untuk testing!)
-  console.log("Key Terbaca:", process.env.XENDIT_SECRET_KEY?.substring(0, 20) + "...");
-
-  if (!process.env.XENDIT_SECRET_KEY) {
-    return NextResponse.json({ error: "Secret Key tidak ditemukan di environment" }, { status: 500 });
+  // 1. Validasi keberadaan Secret Key di Environment
+  const secretKey = process.env.XENDIT_SECRET_KEY;
+  
+  if (!secretKey) {
+    console.error("CRITICAL ERROR: XENDIT_SECRET_KEY is missing in environment variables.");
+    return NextResponse.json(
+      { error: "Konfigurasi Server Salah: API Key tidak ditemukan." },
+      { status: 500 }
+    );
   }
 
+  // 2. Inisialisasi Xendit Client
   const xenditClient = new Xendit({
-    secretKey: process.env.XENDIT_SECRET_KEY,
+    secretKey: secretKey,
   });
 
   try {
-    const { items, totalAmount } = await request.json();
-    
-    // Gunakan xenditClient.Invoice (Sesuai dokumentasi SDK v2)
-  // src/app/api/checkout/route.ts
-const response = await xenditClient.Invoice.createInvoice({
-  data: {
-    externalId: `order-${Date.now()}`,
-    amount: totalAmount,
-    currency: "IDR",
-    description: "Pembayaran Asli Toko Fatah",
-    // Menentukan metode pembayaran (Opsional, secara default semua aktif)
-    paymentMethods: ["QRIS", "VIRTUAL_ACCOUNT", "EWALLET"],
-    successRedirectUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/success`,
- // Invoice berlaku 1 jam
-  }
-});
+    const body = await request.json();
+    const { items, totalAmount } = body;
 
-    return NextResponse.json({ invoiceUrl: response.invoiceUrl });
-  } catch (error: any) {
-    console.error("Xendit Error Detail:", error);
+    // 3. Deteksi Domain secara otomatis untuk Redirect URL
+    // Jika di Vercel, dia akan mengambil domain vercel, jika lokal dia pakai localhost
+    const origin = request.headers.get('origin') || 'http://localhost:3000';
+
+    // 4. Membuat Invoice Xendit
+    const response = await xenditClient.Invoice.createInvoice({
+      data: {
+        externalId: `fatah-store-${Date.now()}`,
+        amount: totalAmount,
+        currency: "IDR",
+        description: `Pembayaran Toko Fatah - ${items.length} item`,
+        items: items.map((item: any) => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        // URL otomatis menyesuaikan tempat aplikasi di-deploy
+        successRedirectUrl: `${origin}/success`,
+        failureRedirectUrl: `${origin}`,
+      }
+    });
+
+    // 5. Kirim URL Invoice ke Frontend
     return NextResponse.json({ 
-      error: error.errorMessage || "Gagal membuat invoice",
-      code: error.errorCode 
-    }, { status: 500 });
+      invoiceUrl: response.invoiceUrl,
+      externalId: response.externalId 
+    });
+
+  } catch (error: any) {
+    // Logging detail error di console server untuk debugging
+    console.error("XENDIT_API_ERROR:", error.response?.data || error.message);
+
+    return NextResponse.json(
+      { 
+        error: "Gagal memproses pembayaran ke Xendit",
+        message: error.errorMessage || error.message,
+        errorCode: error.errorCode
+      },
+      { status: 500 }
+    );
   }
 }
