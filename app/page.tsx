@@ -2,9 +2,9 @@
 import { useState, useEffect } from "react";
 
 const PRODUCTS = [
-  { id: 1, name: "Premium Coffee Bean", price: 1, img: "☕", desc: "Biji kopi pilihan kualitas ekspor." },
-  { id: 2, name: "Sweet Bubble Gum", price: 2, img: "🍬", desc: "Permen karet manis tahan lama." },
-  { id: 3, name: "Golden Crisp Snack", price: 3, img: "🍘", desc: "Kerupuk renyah gurih tiada duanya." },
+  { id: 1, name: "Premium Coffee Bean", price: 1000, img: "☕", desc: "Biji kopi pilihan kualitas ekspor." },
+  { id: 2, name: "Sweet Bubble Gum", price: 2000, img: "🍬", desc: "Permen karet manis tahan lama." },
+  { id: 3, name: "Golden Crisp Snack", price: 3000, img: "🍘", desc: "Kerupuk renyah gurih tiada duanya." },
 ];
 
 export default function StorePage() {
