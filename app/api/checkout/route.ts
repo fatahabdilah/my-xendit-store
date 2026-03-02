@@ -2,65 +2,51 @@ import { NextResponse } from 'next/server';
 import Xendit from 'xendit-node';
 
 export async function POST(request: Request) {
-  // 1. Validasi keberadaan Secret Key di Environment
+  // Pastikan Secret Key terbaca
   const secretKey = process.env.XENDIT_SECRET_KEY;
   
   if (!secretKey) {
-    console.error("CRITICAL ERROR: XENDIT_SECRET_KEY is missing in environment variables.");
     return NextResponse.json(
-      { error: "Konfigurasi Server Salah: API Key tidak ditemukan." },
+      { error: "API Key tidak terbaca di server Vercel" },
       { status: 500 }
     );
   }
 
-  // 2. Inisialisasi Xendit Client
-  const xenditClient = new Xendit({
-    secretKey: secretKey,
-  });
+  const xenditClient = new Xendit({ secretKey });
 
   try {
-    const body = await request.json();
-    const { items, totalAmount } = body;
+    const { items, totalAmount } = await request.json();
 
-    // 3. Deteksi Domain secara otomatis untuk Redirect URL
-    // Jika di Vercel, dia akan mengambil domain vercel, jika lokal dia pakai localhost
-    const origin = request.headers.get('origin') || 'http://localhost:3000';
+    // Gunakan URL absolut dari environment variable Vercel jika tersedia
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : (request.headers.get('origin') || 'http://localhost:3000');
 
-    // 4. Membuat Invoice Xendit
     const response = await xenditClient.Invoice.createInvoice({
       data: {
-        externalId: `fatah-store-${Date.now()}`,
+        externalId: `invoice-${Date.now()}`,
         amount: totalAmount,
         currency: "IDR",
-        description: `Pembayaran Toko Fatah - ${items.length} item`,
+        description: "Pembayaran Toko Fatah Online",
         items: items.map((item: any) => ({
           name: item.name,
           quantity: item.quantity,
           price: item.price,
         })),
-        // URL otomatis menyesuaikan tempat aplikasi di-deploy
-        successRedirectUrl: `${origin}/success`,
-        failureRedirectUrl: `${origin}`,
+        successRedirectUrl: `${baseUrl}/success`,
+        failureRedirectUrl: `${baseUrl}`,
       }
     });
 
-    // 5. Kirim URL Invoice ke Frontend
-    return NextResponse.json({ 
-      invoiceUrl: response.invoiceUrl,
-      externalId: response.externalId 
-    });
+    return NextResponse.json({ invoiceUrl: response.invoiceUrl });
 
   } catch (error: any) {
-    // Logging detail error di console server untuk debugging
-    console.error("XENDIT_API_ERROR:", error.response?.data || error.message);
+    // Log ini akan muncul di 'Logs' tab di Vercel Dashboard
+    console.error("XENDIT_ERROR_LOG:", error);
 
-    return NextResponse.json(
-      { 
-        error: "Gagal memproses pembayaran ke Xendit",
-        message: error.errorMessage || error.message,
-        errorCode: error.errorCode
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+      error: "Gagal memproses pembayaran ke Xendit",
+      message: error.errorMessage || "Pastikan API Key berstatus Write untuk Invoices"
+    }, { status: 500 });
   }
 }
